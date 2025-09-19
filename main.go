@@ -5,19 +5,23 @@ import (
 	"os"
 )
 
+var version = "dev" // Set by build flags
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage:")
-		fmt.Println("  deps get github.com/user/repo[@ref]")
-		fmt.Println("  deps check")
-		fmt.Println("  deps install")
-		fmt.Println("  deps update [github.com/user/repo]")
+		showUsage()
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
 
 	switch command {
+	case "version", "--version", "-v":
+		fmt.Printf("deps %s\n", version)
+		return
+	case "help", "--help", "-h":
+		showUsage()
+		return
 	case "get":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: deps get github.com/user/repo[@ref]")
@@ -36,8 +40,20 @@ func main() {
 		handleUpdate(repoURL)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
+		showUsage()
 		os.Exit(1)
 	}
+}
+
+func showUsage() {
+	fmt.Printf("deps %s - Language agnostic dependency manager\n\n", version)
+	fmt.Println("Usage:")
+	fmt.Println("  deps get github.com/user/repo[@ref]   Add a dependency")
+	fmt.Println("  deps check                            Check dependency status")
+	fmt.Println("  deps install                          Install missing dependencies")
+	fmt.Println("  deps update [github.com/user/repo]    Update dependencies")
+	fmt.Println("  deps version                          Show version")
+	fmt.Println("  deps help                             Show this help")
 }
 
 func handleGet(repoSpec string) {

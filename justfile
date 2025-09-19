@@ -63,8 +63,20 @@ info: build-prod
 # Quick development workflow - format, build, test
 dev: fmt build test
 
-# Release workflow - format, lint, build all platforms
+# Create and push a git tag for release
+tag VERSION:
+    git tag -a "v{{VERSION}}" -m "Release v{{VERSION}}"
+    git push origin "v{{VERSION}}"
+    @echo "Tagged and pushed v{{VERSION}}"
+
+# Build release locally (for testing)
 release VERSION: fmt lint clean dist
     just build-version {{VERSION}}
     just build-all
     @echo "Release {{VERSION}} built successfully in dist/"
+
+# Full release workflow - tag and let GitHub Actions handle the rest
+publish VERSION: fmt lint
+    @echo "Creating release v{{VERSION}}..."
+    @echo "This will trigger GitHub Actions to build and publish binaries"
+    just tag {{VERSION}}
