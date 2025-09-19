@@ -20,21 +20,56 @@ Originally created for the [Odin programming language](https://odin-lang.org/) w
 
 ## Installation
 
-### Pre-built Binaries (Coming Soon)
-Download the latest release for your platform from the [releases page](https://github.com/moomerman/deps/releases).
+### Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from the [releases page](https://github.com/moomerman/deps/releases/latest).
+
+**Linux/macOS:**
+```bash
+# Linux x64
+curl -L https://github.com/moomerman/deps/releases/latest/download/deps-linux-amd64.tar.gz | tar xz
+
+# Linux ARM64
+curl -L https://github.com/moomerman/deps/releases/latest/download/deps-linux-arm64.tar.gz | tar xz
+
+# macOS Intel
+curl -L https://github.com/moomerman/deps/releases/latest/download/deps-darwin-amd64.tar.gz | tar xz
+
+# macOS Apple Silicon
+curl -L https://github.com/moomerman/deps/releases/latest/download/deps-darwin-arm64.tar.gz | tar xz
+```
+
+**Windows:**
+Download and extract the [Windows release](https://github.com/moomerman/deps/releases/latest/download/deps-windows-amd64.zip).
+
+### GitHub Action (CI/CD)
+
+Use in your GitHub workflows:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: moomerman/deps@v1
+    with:
+      command: install
+```
+
+### Docker
+
+```bash
+docker run --rm -v $(pwd):/workspace -w /workspace \
+  ghcr.io/moomerman/deps-action:latest install
+```
 
 ### Build from Source
+
 ```bash
 git clone https://github.com/moomerman/deps.git
 cd deps
-
-# Development build
-go build -o deps *.go
-
 # Production build (recommended)
 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o deps *.go
 
-# Or use just (if installed)
+# Or use just (if installed)  
 just build-prod
 ```
 
@@ -100,6 +135,51 @@ deps update
 ```bash
 deps update github.com/user/repo
 ```
+
+**Show version:**
+```bash
+deps version
+```
+
+**Show help:**
+```bash
+deps help
+```
+
+## GitHub Action Usage
+
+### Basic CI Workflow
+
+```yaml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: moomerman/deps@v1
+        with:
+          command: install
+      - name: Build
+        run: |
+          # Your build commands
+          odin build src -out:app
+```
+
+### Available Commands
+
+- `install` - Install dependencies from `.deps.lock` (default)
+- `check` - Check dependency status
+- `update` - Update all dependencies
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `command` | Command to run | `install` |
+| `working-directory` | Directory to run in | `.` |
 
 ## Project Structure
 
@@ -183,9 +263,10 @@ The lockfile format is intentionally minimal - containing only the essential inf
 ## How It Works
 
 1. **Resolution**: `deps` uses the GitHub API to resolve branches/tags to specific commit SHAs
-2. **Download**: Downloads the repository tarball from GitHub's CDN
+2. **Download**: Downloads the repository tarball from GitHub's CDN  
 3. **Extraction**: Extracts source files directly to `.deps/github.com/owner/repo/` (no hash subdirectories)
 4. **Tracking**: Records exact commit SHAs in a minimal `.deps.lock` file for reproducibility
+5. **Verification**: Simple directory existence checks (trusts the lockfile for exact versions)
 
 ## Limitations
 
