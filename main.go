@@ -97,7 +97,7 @@ func handleGet(repoSpec string) {
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ Added %s@%s (%s)\n", repoURL, resolvedRef, sha[:8])
+	fmt.Printf("%s Added %s@%s (%s)\n", colorize(colorGreen, "✓"), repoURL, resolvedRef, sha[:8])
 }
 
 func handleCheck() {
@@ -121,17 +121,17 @@ func handleCheck() {
 
 		switch status {
 		case "ok":
-			fmt.Printf("✓ %s@%s (%s)\n", repoURL, dep.Ref, dep.SHA[:8])
+			fmt.Printf("%s %s@%s (%s)\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 		case "missing":
-			fmt.Printf("✗ %s: MISSING - run 'deps install'\n", repoURL)
+			fmt.Printf("%s %s: MISSING - run 'deps install'\n", colorize(colorRed, "✗"), repoURL)
 			allGood = false
 		}
 	}
 
 	if allGood {
-		fmt.Println("\n✓ All dependencies are up to date")
+		fmt.Printf("\n%s All dependencies are up to date\n", colorize(colorGreen, "✓"))
 	} else {
-		fmt.Println("\n✗ Some dependencies need attention")
+		fmt.Printf("\n%s Some dependencies need attention\n", colorize(colorRed, "✗"))
 	}
 }
 
@@ -153,7 +153,7 @@ func handleInstall() {
 		}
 
 		if status == "ok" {
-			fmt.Printf("✓ %s@%s (%s) - already installed\n", repoURL, dep.Ref, dep.SHA[:8])
+			fmt.Printf("%s %s@%s (%s) - already installed\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 			continue
 		}
 
@@ -161,20 +161,20 @@ func handleInstall() {
 
 		owner, repo, err := parseGitHubURL(repoURL)
 		if err != nil {
-			fmt.Printf("✗ Error parsing URL %s: %v\n", repoURL, err)
+			fmt.Printf("%s Error parsing URL %s: %v\n", colorize(colorRed, "✗"), repoURL, err)
 			continue
 		}
 
 		err = downloadRepo(owner, repo, dep.SHA, repoURL)
 		if err != nil {
-			fmt.Printf("✗ Error downloading %s: %v\n", repoURL, err)
+			fmt.Printf("%s Error downloading %s: %v\n", colorize(colorRed, "✗"), repoURL, err)
 			continue
 		}
 
-		fmt.Printf("✓ Installed %s@%s (%s)\n", repoURL, dep.Ref, dep.SHA[:8])
+		fmt.Printf("%s Installed %s@%s (%s)\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 	}
 
-	fmt.Println("\n✓ Installation complete")
+	fmt.Printf("\n%s Installation complete\n", colorize(colorGreen, "✓"))
 }
 
 func handleUpdate(specificRepo string) {
@@ -204,7 +204,7 @@ func handleUpdate(specificRepo string) {
 			}
 		}
 		if !updated {
-			fmt.Println("\n✓ All dependencies are up to date")
+			fmt.Printf("\n%s All dependencies are up to date\n", colorize(colorGreen, "✓"))
 		}
 	}
 

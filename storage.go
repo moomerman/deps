@@ -12,6 +12,39 @@ import (
 	"strings"
 )
 
+// ANSI color codes
+const (
+	colorReset  = "\033[0m"
+	colorGreen  = "\033[32m"
+	colorRed    = "\033[31m"
+	colorYellow = "\033[33m"
+)
+
+// Check if output supports colors
+func supportsColor() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	return isatty()
+}
+
+// Simple TTY check (works on Unix-like systems)
+func isatty() bool {
+	fd := os.Stdout.Fd()
+	return fd == 1 || fd == 2 // stdout or stderr
+}
+
+// Colorize text if colors are supported
+func colorize(color, text string) string {
+	if supportsColor() {
+		return color + text + colorReset
+	}
+	return text
+}
+
 type LockFile struct {
 	Dependencies map[string]Dependency `json:"dependencies"`
 }
@@ -72,12 +105,12 @@ func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
 	// Resolve current state of the original ref
 	currentSHA, currentRef, err := resolveRef(owner, repo, dep.Ref)
 	if err != nil {
-		fmt.Printf("✗ Error resolving %s@%s: %v\n", repoURL, dep.Ref, err)
+		fmt.Printf("%s Error resolving %s@%s: %v\n", colorize(colorRed, "✗"), repoURL, dep.Ref, err)
 		return false
 	}
 
 	if currentSHA == dep.SHA {
-		fmt.Printf("✓ %s@%s (%s) - no update available\n", repoURL, dep.Ref, dep.SHA[:8])
+		fmt.Printf("%s %s@%s (%s) - no update available\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 		return false
 	}
 
@@ -88,7 +121,7 @@ func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
 	// Download updated version
 	err = downloadRepo(owner, repo, currentSHA, repoURL)
 	if err != nil {
-		fmt.Printf("✗ Error downloading update: %v\n", err)
+		fmt.Printf("%s Error downloading update: %v\n", colorize(colorRed, "✗"), err)
 		return false
 	}
 
@@ -98,7 +131,7 @@ func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
 		SHA: currentSHA,
 	}
 
-	fmt.Printf("✓ Updated %s to %s (%s)\n", repoURL, currentRef, currentSHA[:8])
+	fmt.Printf("%s Updated %s to %s (%s)\n", colorize(colorGreen, "✓"), repoURL, currentRef, currentSHA[:8])
 	return true
 }
 
