@@ -17,31 +17,71 @@ inputs:
     default: "."
 
 runs:
-  using: "docker"
-  image: "action/Dockerfile"
-  args:
-    - ${{ inputs.command }}
-  env:
-    WORKING_DIR: ${{ inputs.working-directory }}
+  using: "composite"
+  steps:
+    - name: Download deps binary
+      shell: bash
+      run: |
+        set -e
 
-examples: |
-  # Install dependencies from .deps.lock
-  - uses: moomerman/deps@v1
-    with:
-      command: install
+        # Determine platform and architecture
+        case "${{ runner.os }}" in
+          Linux) os_name="linux" ;;
+          macOS) os_name="darwin" ;;
+          Windows) os_name="windows" ;;
+          *) echo "Unsupported OS: ${{ runner.os }}"; exit 1 ;;
+        esac
 
-  # Check dependency status
-  - uses: moomerman/deps@v1
-    with:
-      command: check
+        case "${{ runner.arch }}" in
+          X64) arch_name="amd64" ;;
+          ARM64) arch_name="arm64" ;;
+          *) echo "Unsupported architecture: ${{ runner.arch }}"; exit 1 ;;
+        esac
 
-  # Update all dependencies
-  - uses: moomerman/deps@v1
-    with:
-      command: update
+        # Set file extension for Windows
+        ext=""
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          ext=".exe"
+        fi
 
-  # Run in a subdirectory
-  - uses: moomerman/deps@v1
-    with:
-      command: install
-      working-directory: ./my-project
+        binary_name="deps-${os_name}-${arch_name}"
+        archive_name="${binary_name}.tar.gz"
+
+        # Handle Windows zip files
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          archive_name="${binary_name}.zip"
+        fi
+
+        echo "Downloading ${archive_name}..."
+
+        # Download binary
+        curl -L -f -o "deps-archive" \
+          "https://github.com/moomerman/deps/releases/latest/download/${archive_name}"
+
+        # Extract binary
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          unzip -q deps-archive
+        else
+          tar -xzf deps-archive
+        fi
+
+        # Make binary executable and move to final location
+        chmod +x "${binary_name}${ext}"
+        mv "${binary_name}${ext}" "deps${ext}"
+
+        # Clean up
+        rm -f deps-archive
+
+        echo "deps binary downloaded and ready"
+
+    - name: Run deps command
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        ext=""
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          ext=".exe"
+        fi
+
+        # Run deps command
+        "$GITHUB_WORKSPACE/deps${ext}" ${{ inputs.command }}
