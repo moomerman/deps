@@ -1,0 +1,47 @@
+name: "deps - Language Agnostic Dependency Manager"
+description: "Install and manage dependencies from GitHub repositories"
+author: "moomerman"
+
+branding:
+  icon: "package"
+  color: "blue"
+
+inputs:
+  command:
+    description: "Command to run (install, check, update)"
+    required: false
+    default: "install"
+  working-directory:
+    description: "Working directory to run deps in"
+    required: false
+    default: "."
+
+runs:
+  using: "docker"
+  image: "action/Dockerfile"
+  args:
+    - ${{ inputs.command }}
+  env:
+    WORKING_DIR: ${{ inputs.working-directory }}
+
+examples: |
+  # Install dependencies from .deps.lock
+  - uses: moomerman/deps@v1
+    with:
+      command: install
+
+  # Check dependency status
+  - uses: moomerman/deps@v1
+    with:
+      command: check
+
+  # Update all dependencies
+  - uses: moomerman/deps@v1
+    with:
+      command: update
+
+  # Run in a subdirectory
+  - uses: moomerman/deps@v1
+    with:
+      command: install
+      working-directory: ./my-project
