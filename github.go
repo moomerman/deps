@@ -9,6 +9,9 @@ import (
 	"strings"
 )
 
+var httpClient = http.DefaultClient
+var githubAPIBaseURL = "https://api.github.com"
+
 type GitHubRepo struct {
 	DefaultBranch string `json:"default_branch"`
 }
@@ -76,8 +79,8 @@ func resolveRef(owner, repo, ref string) (sha, resolvedRef string, err error) {
 
 func getLatestCommitSHA(owner, repo string) (sha, defaultBranch string, err error) {
 	// First get the default branch
-	repoURL := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
-	resp, err := http.Get(repoURL)
+	repoURL := fmt.Sprintf("%s/repos/%s/%s", githubAPIBaseURL, owner, repo)
+	resp, err := httpClient.Get(repoURL)
 	if err != nil {
 		return "", "", err
 	}
@@ -99,8 +102,8 @@ func getLatestCommitSHA(owner, repo string) (sha, defaultBranch string, err erro
 	}
 
 	// Now get the latest commit from the default branch
-	branchURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/branches/%s", owner, repo, repoInfo.DefaultBranch)
-	resp, err = http.Get(branchURL)
+	branchURL := fmt.Sprintf("%s/repos/%s/%s/branches/%s", githubAPIBaseURL, owner, repo, repoInfo.DefaultBranch)
+	resp, err = httpClient.Get(branchURL)
 	if err != nil {
 		return "", "", err
 	}
@@ -125,8 +128,8 @@ func getLatestCommitSHA(owner, repo string) (sha, defaultBranch string, err erro
 }
 
 func getBranchCommitSHA(owner, repo, branch string) (sha, resolvedRef string, err error) {
-	branchURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/branches/%s", owner, repo, branch)
-	resp, err := http.Get(branchURL)
+	branchURL := fmt.Sprintf("%s/repos/%s/%s/branches/%s", githubAPIBaseURL, owner, repo, branch)
+	resp, err := httpClient.Get(branchURL)
 	if err != nil {
 		return "", "", err
 	}
@@ -151,8 +154,8 @@ func getBranchCommitSHA(owner, repo, branch string) (sha, resolvedRef string, er
 }
 
 func getTagCommitSHA(owner, repo, tag string) (string, error) {
-	tagURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/tags/%s", owner, repo, tag)
-	resp, err := http.Get(tagURL)
+	tagURL := fmt.Sprintf("%s/repos/%s/%s/git/refs/tags/%s", githubAPIBaseURL, owner, repo, tag)
+	resp, err := httpClient.Get(tagURL)
 	if err != nil {
 		return "", err
 	}

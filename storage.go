@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,9 +166,9 @@ func downloadRepo(owner, repo, sha, repoURL string) (string, error) {
 	}
 
 	// Download tarball
-	tarballURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tarball/%s", owner, repo, sha)
+	tarballURL := fmt.Sprintf("%s/repos/%s/%s/tarball/%s", githubAPIBaseURL, owner, repo, sha)
 
-	resp, err := http.Get(tarballURL)
+	resp, err := httpClient.Get(tarballURL)
 	if err != nil {
 		return "", err
 	}
