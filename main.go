@@ -86,7 +86,7 @@ func handleGet(repoSpec string) {
 	fmt.Printf("Resolved to %s@%s\n", resolvedRef, sha[:8])
 
 	// Download and extract
-	err = downloadRepo(owner, repo, sha, repoURL)
+	hash, err := downloadRepo(owner, repo, sha, repoURL)
 	if err != nil {
 		fmt.Printf("Error downloading repo: %v\n", err)
 		os.Exit(1)
@@ -102,8 +102,9 @@ func handleGet(repoSpec string) {
 	}
 
 	lockFile.Dependencies[repoURL] = Dependency{
-		Ref: originalRef,
-		SHA: sha,
+		Ref:  originalRef,
+		SHA:  sha,
+		Hash: hash,
 	}
 
 	// Save lock file
@@ -128,19 +129,21 @@ func handleCheck() {
 
 	allGood := true
 	for repoURL, dep := range lockFile.Dependencies {
-		status, err := checkDependency(repoURL, dep)
+		result, err := checkDependency(repoURL, dep)
 		if err != nil {
-			fmt.Printf("✗ %s: ERROR - %v\n", repoURL, err)
+			fmt.Printf("%s %s: ERROR - %v\n", colorize(colorRed, "✗"), repoURL, err)
 			allGood = false
 			continue
 		}
 
-		switch status {
+		switch result.Status {
 		case "ok":
 			fmt.Printf("%s %s@%s (%s)\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 		case "missing":
 			fmt.Printf("%s %s: MISSING - run 'deps install'\n", colorize(colorRed, "✗"), repoURL)
 			allGood = false
+		case "update_available":
+			fmt.Printf("%s %s@%s — update available (%s → %s)\n", colorize(colorYellow, "⬆"), repoURL, dep.Ref, dep.SHA[:8], result.LatestSHA[:8])
 		}
 	}
 
@@ -161,14 +164,12 @@ func handleInstall() {
 
 	fmt.Printf("Installing %d dependencies:\n\n", len(lockFile.Dependencies))
 
-	for repoURL, dep := range lockFile.Dependencies {
-		status, err := checkDependency(repoURL, dep)
-		if err != nil {
-			fmt.Printf("✗ %s: ERROR - %v\n", repoURL, err)
-			continue
-		}
+	lockFileUpdated := false
 
-		if status == "ok" {
+	for repoURL, dep := range lockFile.Dependencies {
+		// Use a lightweight check (directory existence only) for install
+		depPath := getDepPath(repoURL)
+		if _, err := os.Stat(depPath); err == nil {
 			fmt.Printf("%s %s@%s (%s) - already installed\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
 			continue
 		}
@@ -181,13 +182,36 @@ func handleInstall() {
 			continue
 		}
 
-		err = downloadRepo(owner, repo, dep.SHA, repoURL)
+		hash, err := downloadRepo(owner, repo, dep.SHA, repoURL)
 		if err != nil {
 			fmt.Printf("%s Error downloading %s: %v\n", colorize(colorRed, "✗"), repoURL, err)
 			continue
 		}
 
+		// Verify hash if one is recorded in the lock file
+		if dep.Hash != "" {
+			if hash != dep.Hash {
+				// Hash mismatch — remove the downloaded content
+				os.RemoveAll(depPath)
+				fmt.Printf("%s %s: hash mismatch (expected %s, got %s)\n", colorize(colorRed, "✗"), repoURL, dep.Hash[:12], hash[:12])
+				continue
+			}
+		} else {
+			// No hash in lock file — record the one we just computed
+			dep.Hash = hash
+			lockFile.Dependencies[repoURL] = dep
+			lockFileUpdated = true
+		}
+
 		fmt.Printf("%s Installed %s@%s (%s)\n", colorize(colorGreen, "✓"), repoURL, dep.Ref, dep.SHA[:8])
+	}
+
+	if lockFileUpdated {
+		err := saveLockFile(lockFile)
+		if err != nil {
+			fmt.Printf("Error saving lock file: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("\n%s Installation complete\n", colorize(colorGreen, "✓"))

@@ -3,6 +3,8 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,8 +52,14 @@ type LockFile struct {
 }
 
 type Dependency struct {
-	Ref string `json:"ref"`
-	SHA string `json:"sha"`
+	Ref  string `json:"ref"`
+	SHA  string `json:"sha"`
+	Hash string `json:"hash,omitempty"`
+}
+
+type CheckResult struct {
+	Status    string // "ok", "missing", "update_available"
+	LatestSHA string // populated when Status == "update_available"
 }
 
 func loadLockFile() *LockFile {
@@ -85,14 +93,29 @@ func saveLockFile(lockFile *LockFile) error {
 	return os.WriteFile(".deps.lock", data, 0644)
 }
 
-func checkDependency(repoURL string, dep Dependency) (string, error) {
+func checkDependency(repoURL string, dep Dependency) (CheckResult, error) {
 	// Check if directory exists
 	depPath := getDepPath(repoURL)
 	if _, err := os.Stat(depPath); os.IsNotExist(err) {
-		return "missing", nil
+		return CheckResult{Status: "missing"}, nil
 	}
 
-	return "ok", nil
+	// Resolve the current SHA for the tracked ref to detect updates
+	owner, repo, err := parseGitHubURL(repoURL)
+	if err != nil {
+		return CheckResult{}, fmt.Errorf("parsing URL: %v", err)
+	}
+
+	currentSHA, _, err := resolveRef(owner, repo, dep.Ref)
+	if err != nil {
+		return CheckResult{}, fmt.Errorf("resolving ref %s: %v", dep.Ref, err)
+	}
+
+	if currentSHA != dep.SHA {
+		return CheckResult{Status: "update_available", LatestSHA: currentSHA}, nil
+	}
+
+	return CheckResult{Status: "ok"}, nil
 }
 
 func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
@@ -119,7 +142,7 @@ func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
 	fmt.Printf("  Latest:  %s (%s)\n", currentSHA[:8], currentRef)
 
 	// Download updated version
-	err = downloadRepo(owner, repo, currentSHA, repoURL)
+	hash, err := downloadRepo(owner, repo, currentSHA, repoURL)
 	if err != nil {
 		fmt.Printf("%s Error downloading update: %v\n", colorize(colorRed, "✗"), err)
 		return false
@@ -127,19 +150,20 @@ func updateDependency(repoURL string, dep Dependency, lockFile *LockFile) bool {
 
 	// Update lock file entry
 	lockFile.Dependencies[repoURL] = Dependency{
-		Ref: dep.Ref,
-		SHA: currentSHA,
+		Ref:  dep.Ref,
+		SHA:  currentSHA,
+		Hash: hash,
 	}
 
 	fmt.Printf("%s Updated %s to %s (%s)\n", colorize(colorGreen, "✓"), repoURL, currentRef, currentSHA[:8])
 	return true
 }
 
-func downloadRepo(owner, repo, sha, repoURL string) error {
+func downloadRepo(owner, repo, sha, repoURL string) (string, error) {
 	// Create .deps directory if it doesn't exist
 	err := os.MkdirAll(".deps", 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Download tarball
@@ -147,23 +171,29 @@ func downloadRepo(owner, repo, sha, repoURL string) error {
 
 	resp, err := http.Get(tarballURL)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
+
+	// Hash the tarball content as we stream it through
+	hasher := sha256.New()
+	reader := io.TeeReader(resp.Body, hasher)
 
 	// Extract tarball
 	depPath := getDepPath(repoURL)
-	err = extractTarball(resp.Body, depPath)
+	err = extractTarball(reader, depPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
+	hash := hex.EncodeToString(hasher.Sum(nil))
+
 	fmt.Printf("Downloaded to %s\n", depPath)
-	return nil
+	return hash, nil
 }
 
 func extractTarball(r io.Reader, destPath string) error {

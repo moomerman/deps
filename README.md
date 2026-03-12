@@ -245,11 +245,13 @@ The `.deps.lock` file tracks exact versions for reproducible builds:
   "dependencies": {
     "github.com/floooh/sokol-odin": {
       "ref": "main",
-      "sha": "2fbaae3c245b2f65c961ef4a38482c81f6bbae6c"
+      "sha": "2fbaae3c245b2f65c961ef4a38482c81f6bbae6c",
+      "hash": "a1b2c3d4e5f6..."
     },
     "github.com/gin-gonic/gin": {
       "ref": "v1.10.0",
-      "sha": "75ccf94d605a05fe24817fc2f166f6f2959d5cea"
+      "sha": "75ccf94d605a05fe24817fc2f166f6f2959d5cea",
+      "hash": "f6e5d4c3b2a1..."
     }
   }
 }
@@ -257,6 +259,7 @@ The `.deps.lock` file tracks exact versions for reproducible builds:
 
 - `ref`: What you specified (e.g., `v1.10.0`, `main`, `feature-branch`)
 - `sha`: The exact commit SHA that was downloaded
+- `hash`: SHA-256 hash of the downloaded tarball, used for integrity verification on install
 
 The lockfile format is intentionally minimal - containing only the essential information needed for reproducible builds.
 
@@ -265,8 +268,8 @@ The lockfile format is intentionally minimal - containing only the essential inf
 1. **Resolution**: `deps` uses the GitHub API to resolve branches/tags to specific commit SHAs
 2. **Download**: Downloads the repository tarball from GitHub's CDN  
 3. **Extraction**: Extracts source files directly to `.deps/github.com/owner/repo/` (no hash subdirectories)
-4. **Tracking**: Records exact commit SHAs in a minimal `.deps.lock` file for reproducibility
-5. **Verification**: Simple directory existence checks (trusts the lockfile for exact versions)
+4. **Tracking**: Records exact commit SHAs and a content hash in a minimal `.deps.lock` file for reproducibility
+5. **Verification**: On install, verifies the SHA-256 hash of the downloaded tarball against the lock file to ensure integrity. On check, queries the GitHub API to detect available updates.
 
 ## Limitations
 
